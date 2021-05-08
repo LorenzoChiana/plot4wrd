@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import sys     # for comand line options
 import animate # needs conda install fsspec
 
-def init_df(df):
+def initDF(df, sensor_type):
     df = df.replace('-', np.nan)
     df.time = df.time.astype('datetime64[ns]')
     df.x = df.x.astype(float)
@@ -13,8 +13,12 @@ def init_df(df):
     df.quality = df.quality.astype(float)
     # set time ad index of time series
     df.set_index('time', inplace=True)
-    # fake distance
-    df['distance'] = df[['x','y']].mean(axis=1)
+    
+    antennas = anchors_df if sensor_type == 'uwb' else cameras_df
+   
+    # distance calculation with \left(x_i-x_j\right)^2+\left(y_i-y_j\right)^2=d_{ij}^2 formula
+    for index, row in antennas.iterrows():
+            df['distance_'+index] = np.sqrt((row['x'] - df.x)**2 + (row['y'] - df.y)**2)
     return df
 
 def parse_cv_data():
@@ -22,7 +26,7 @@ def parse_cv_data():
                                   sep=',',
                                   names=['time', 'tagID', 'x', 'y', 'z', 'quality'],
                                   header=None))
-    return init_df(df)
+    return initDF(df, 'cv')
 
 def parse_uwb_data():
     # keep only the lines that contain the 0) key string
@@ -49,7 +53,7 @@ def parse_uwb_data():
                                      names=['time', 'tagID', 'x', 'y', 'z', 'quality','nix'],
                                   header=None))
        df = df.drop(columns=['nix'])
-    return init_df(df)
+    return initDF(df, 'uwb')
 
 def plotStanza(xfig, yfig, fig=None):
     if fig is None:
@@ -71,13 +75,15 @@ def plotPath():
     for cameras_name, cameras_pos in cameras_df.iterrows():
         ax.annotate(cameras_name, (cameras_pos.y, cameras_pos.x), xytext=(cameras_pos.y+0.25, cameras_pos.x-0.25), fontsize=18, color='black')
     
-    ax.scatter(dfmerged['y_1'], dfmerged['x_1'], c="blue", label=dfmerged['tagID_1'], edgecolors='none')
-    ax.scatter(dfmerged['y_2'], dfmerged['x_2'], c="orange", label=dfmerged['tagID_2'], edgecolors='none')
-    
+    ax.scatter(dfmerged['y_CV'], dfmerged['x_CV'], c="blue", label=dfmerged['tagID_CV'], edgecolors='none')
+    ax.scatter(dfmerged['y_UWB'], dfmerged['x_UWB'], c="orange", label=dfmerged['tagID_UWB'], edgecolors='none')
     
     #a = animate.AnimatedScatter(numtimes,dfmerged,xfig,yfig)
     plotStanza(xfig, yfig, fig)
     plt.show()
+    
+def calculateDistances():
+    print()
 
 def main():  
     global anchors_df
@@ -98,7 +104,7 @@ def main():
     cv_df.x = 5 - cv_df.x
     
     global dfmerged 
-    dfmerged = pd.merge_ordered(cv_df,uwb_df,on="time",suffixes=("_1","_2"), fill_method="ffill")
+    dfmerged = pd.merge_ordered(cv_df,uwb_df,on="time",suffixes=("_CV","_UWB"), fill_method="ffill")
     #ax = plt.gca()
     
     numtimes = len(dfmerged)
