@@ -1,0 +1,1 @@
+Il seguente risultato riporta la visualizzazione dei dati provenienti dalle sorgenti UWB (viola) e CV (giallo) e la loro evoluzione in parallelo.
